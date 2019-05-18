@@ -4,6 +4,8 @@ doeBuild = prob_struct.doeBuild;
 regModel = prob_struct.regModel;
 corModel = prob_struct.corModel;
 
+[nInitialPoints, ~] = size(doeBuild);
+
 lb = prob_struct.lb;
 ub = prob_struct.ub;
 
@@ -100,7 +102,7 @@ while true
         
     else
         fprintf(2', 'Optimizer couldn''t improve from last iteration.')
-        break        
+        break
     end
     
     funEvals = funEvals + 1;
@@ -131,38 +133,70 @@ while true
             gstar(k, :) = gobs(bestSampledIndex,:);
             fstar(k, 1) = fobs(bestSampledIndex);
             
-            xstark = x0;
+            xstar(k + 1,:) = xlhs(end,:);
+            gstar(k + 1,:) = gobs(end,:);
+            fstar(k + 1,1) = fobs(end,:);
         else
-            xstar(k,:) = xlhs(end,:);
-            gstar(k,:) = gobs(end,:);
-            fstar(k,1) = fobs(end,:);
-            
-            bestFeasibleStar = find(min(fstar(all(gstar <= conTol, 2))) == fstar);
-            
-            if numel(bestFeasibleStar) > 1 % if the find returns multiple values, get the last
-                bestFeasibleStar = bestFeasibleStar(end);
-            end
-            
-            xstark = xstar(bestFeasibleStar,:);
-            
-            if norm(xstar(k-1,:) - xstar(k,:))/norm(ub-lb) <= tol2
-                disp('Terminating program, no further improvement possible.');
-                disp(xstar(k,:));
-                disp(fstar(k));
-                
-                if ~isempty(fobs(all(gobs <= conTol, 2)))
-                    feasibleIndex = find(min(fobs(all(gobs <= conTol, 2))) == fobs);
-                    fprintf('\nBest feasible value found: %8.6f\nat point\n',fobs(feasibleIndex))
-                    disp(xlhs(feasibleIndex,:));
-                    idx = rangesearch(xlhs,xlhs(feasibleIndex,:),0.005*norm(lb-ub));
-                    fprintf('%d of points are within 0.5%% euclidian range of this point based on\noriginal domain\n',numel(idx{:})-1);
-                    fprintf('Number of funcion evaluations: %d\n',funEvals);
-                end
-                toc
-                break;
-            end
+            xstar(k + 1,:) = xlhs(end,:);
+            gstar(k + 1,:) = gobs(end,:);
+            fstar(k + 1,1) = fobs(end,:);
         end
         
-        error('Refinement not implemented')
+        % Select the best point to be centered        
+        bestFeasibleStar = find(min(fstar(all(gstar <= conTol, 2))) == fstar);
+        
+        if numel(bestFeasibleStar) > 1 % if the find returns multiple values, get the last
+            bestFeasibleStar = bestFeasibleStar(end);
+        end
+        
+        xstark = xstar(bestFeasibleStar,:);
+        
+        if norm(xstar(end-1,:) - xstar(end,:))/norm(ub-lb) <= tol2
+            disp('Terminating program, no further improvement possible.');
+            disp(xstar(end,:));
+            disp(fstar(end));
+            
+            if ~isempty(fobs(all(gobs <= conTol, 2)))
+                feasibleIndex = find(min(fobs(all(gobs <= conTol, 2))) == fobs);
+                fprintf('\nBest feasible value found: %8.6f\nat point\n',fobs(feasibleIndex))
+                disp(xlhs(feasibleIndex,:));
+                idx = rangesearch(xlhs,xlhs(feasibleIndex,:),0.005*norm(lb-ub));
+                fprintf('%d of points are within 0.5%% euclidian range of this point based on\noriginal domain\n',numel(idx{:})-1);
+                fprintf('Number of funcion evaluations: %d\n',funEvals);
+            end
+            toc
+            break;
+        end
+        
+        % check for hypercube limits
+        if contractNum == 1
+            contractFactor = firstContractionFactor;
+        else
+            contractFactor = secondContractionFactor;
+        end
+        
+        [hub, hlb, exitflagref,ubopt,lbopt] = refineHypercube(xstark,dlb,hlb,dub,hub,contractFactor,tolContraction);
+        
+        if exitflagref == 2 || exitflagref == 4
+            fprintf(2,'--------------- Move! ---------------\n')
+            moveNum = moveNum + 1;
+        end
+        
+        if exitflagref == 1 || exitflagref == 3
+            fprintf(2,'------------- Contract! -------------\n')
+            contractNum = contractNum + 1;
+            % resample the reduced hypercube 04-06
+            [samples,fobsSampled,gobsSampled] = getSamples(xlhsInserted,fobsInserted,gobsInserted,hlb,hub);
+            
+            % each contraction, discard points outside new hypercube
+            % limits
+            xlhs = [xlhs(1:nInitialPoints,:); samples];
+            gobs = [gobs(1:nInitialPoints,:); gobsSampled];
+            fobs = [fobs(1:nInitialPoints,:); fobsSampled];
+        end
+        
+        xjk = xstark;
+        k = k + 1;
+        j = 1;
     end
 end
