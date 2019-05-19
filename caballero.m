@@ -1,4 +1,4 @@
-function [xlhs, gobs, fobs] = caballero(sampleFunction, prob_struct)
+function [xlhs, gobs, fobs, xstar, fstar] = caballero(sampleFunction, prob_struct)
 % TODO: prob_struct field verification (sanitation)
 doeBuild = prob_struct.doeBuild;
 regModel = prob_struct.regModel;
@@ -230,9 +230,7 @@ while true
             
             if sum(moveTrack(k:(k+1))) >= 2
                 % perform large contraction to ensure optimality
-                range = dub - dlb;
-                ubopt = xstark + tolContraction.*range./2;
-                lbopt = xstark - tolContraction.*range./2;
+                [hub, hlb, exitflagref,ubopt,lbopt] = refineHypercube(xstark,dlb,hlb,dub,hub,0.9999,tolContraction);
                 largeContractPerformed = true;
             end
             
