@@ -24,10 +24,10 @@ ps.conTol = 1e-6;
 % define constraint type
 ps.constType = [1 2];
 
-ps.tol1 = 1e-5;
+ps.tol1 = 1e-4;
 ps.tol2 = 1e-6;
 
-ps.tolContraction = 1e-2;
+ps.tolContraction = 1e-4;
 
 ps.firstContractionFactor = 0.8;
 ps.secondContractionFactor = 0.4;
